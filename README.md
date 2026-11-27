@@ -29,11 +29,14 @@ $ZTF_DATA_DIR/
 ## Usage
 
 ```python
-from ztfalertvalidation import get_dza_dir, get_ipac_dir, list_nights
+from ztfalertvalidation import get_dza_dir, get_ipac_dir, list_nights, load_alerts
 
 list_nights()
 # ['20261112']
 
-get_dza_dir("20261112")
-get_ipac_dir("20261112")
+df = load_alerts(get_ipac_dir("20261112"))
 ```
+
+`load_alerts` returns one row per alert, with the `candidate` fields raised to
+the top level. The cutouts, the previous candidates and the forced photometry
+history are left out.
