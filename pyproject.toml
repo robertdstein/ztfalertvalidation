@@ -35,6 +35,8 @@ dependencies = [
     "pandas",
     "tqdm",
     "pyarrow",
+    "astropy",
+    "scipy",
 ]
 
 [project.optional-dependencies]

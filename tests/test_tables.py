@@ -2,13 +2,17 @@
 Tests for caching the alerts of a night as a table
 """
 
+# the avro schema is necessarily the same as the one in test_avro
+# pylint: disable=duplicate-code
+
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
 import fastavro
+import pandas as pd
 
-from ztfalertvalidation import load_cached_table
+from ztfalertvalidation import get_dza_table, load_cached_table
 
 SCHEMA = {
     "type": "record",
@@ -48,3 +52,17 @@ class TestTables(unittest.TestCase):
             cached = load_cached_table(alert_dir, table_path)
 
             self.assertTrue(cached.equals(df))
+
+    def test_dza_sources_are_renamed(self):
+        """Test that cached DZA alerts come back with a DZA name, not a ZTF one"""
+        with TemporaryDirectory() as temp_dir:
+            night = "20261112"
+            night_dir = Path(temp_dir) / night
+            (night_dir / "dza").mkdir(parents=True)
+
+            table = pd.DataFrame({"objectId": ["ZTF26aaipcii"]})
+            table.to_parquet(night_dir / "dza.parquet")
+
+            df = get_dza_table(night, Path(temp_dir))
+
+            self.assertEqual(list(df["objectId"]), ["DZA26aaipcii"])
