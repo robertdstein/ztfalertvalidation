@@ -50,9 +50,9 @@ def compare_quadrants(night: str, data_dir: Path | None = None) -> pd.DataFrame:
     return df.astype("Int64")
 
 
-def list_one_sided_quadrants(night: str, data_dir: Path | None = None) -> pd.DataFrame:
+def list_asymmetric_failures(night: str, data_dir: Path | None = None) -> pd.DataFrame:
     """
-    List the quadrants where only one of the pipelines produced alerts
+    List the quadrants that one pipeline processed and the other did not
 
     A quadrant that neither pipeline produced alerts for is left out, since
     nothing distinguishes a quadrant that went unread from one that yielded
@@ -60,11 +60,11 @@ def list_one_sided_quadrants(night: str, data_dir: Path | None = None) -> pd.Dat
 
     :param night: Night, as a 'YYYYMMDD' string
     :param data_dir: Path to data directory
-    :return: Table with one row per quadrant that only one pipeline produced
+    :return: Table with one row per asymmetric processing failure
     """
     df = compare_quadrants(night, data_dir)
-    one_sided = df[(df == 0).any(axis="columns")]
+    failures = df[(df == 0).any(axis="columns")]
 
-    logger.info(f"Found {len(one_sided)} one-sided quadrants")
+    logger.info(f"Found {len(failures)} asymmetric processing failures")
 
-    return one_sided
+    return failures

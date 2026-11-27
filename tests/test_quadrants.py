@@ -8,7 +8,7 @@ from tempfile import TemporaryDirectory
 
 import pandas as pd
 
-from ztfalertvalidation import compare_quadrants, list_one_sided_quadrants
+from ztfalertvalidation import compare_quadrants, list_asymmetric_failures
 from ztfalertvalidation.checks.quadrants import N_QUADRANTS
 
 NIGHT = "20261112"
@@ -52,13 +52,13 @@ class TestQuadrants(unittest.TestCase):
             self.assertTrue(df.loc[(1.0, 0)].isna().all())
             self.assertTrue(df.loc[(2.0, 0)].isna().all())
 
-    def test_list_one_sided_quadrants(self):
-        """Test that only the quadrants one pipeline missed are listed"""
+    def test_list_asymmetric_failures(self):
+        """Test that only the quadrants one pipeline failed to process are listed"""
         with TemporaryDirectory() as temp_dir:
             data_dir = Path(temp_dir)
             build_example(data_dir)
 
-            df = list_one_sided_quadrants(NIGHT, data_dir)
+            df = list_asymmetric_failures(NIGHT, data_dir)
 
             self.assertEqual(list(df.index), [(2.0, 8)])
             self.assertEqual(list(df.loc[(2.0, 8)]), [0, 1])
