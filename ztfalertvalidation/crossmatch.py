@@ -142,31 +142,38 @@ def get_dza_matches(night: str, data_dir: Path | None = None) -> pd.DataFrame:
 
 
 def add_matches(
-    left: pd.DataFrame,
-    right: pd.DataFrame,
-    matches: pd.DataFrame,
-    name_column: str,
-    dist_column: str,
+    left: pd.DataFrame, right: pd.DataFrame, matches: pd.DataFrame, prefix: str
 ) -> pd.DataFrame:
     """
-    Add the name of each alert's matched source, and the separation
+    Add the name, candid and separation of each alert's matched source
 
-    An alert with no match gets no name and no distance.
+    The candid is kept as a nullable integer: an unmatched alert would
+    otherwise make the column a float, and a candid does not survive being
+    one.
 
     :param left: Table to add the columns to
     :param right: Table the alerts were matched in
     :param matches: Matched pairs, as match_tables gives them
-    :param name_column: Name of the column of matched source names
-    :param dist_column: Name of the column of separations, in arcseconds
-    :return: Copy of the left table, with the two columns added
+    :param prefix: Name the columns take, such as 'DZA' for 'DZAname'
+    :return: Copy of the left table, with the three columns added
     """
-    names = right.set_index("candid")["objectId"]
     pairs = matches.set_index("candid")
+
+    # the columns are looked up by candid, then given the rows' own index, so
+    # that assigning them keeps the nullable integer rather than casting
+    ids = (
+        pairs["match_candid"]
+        .astype("Int64")
+        .reindex(left["candid"])
+        .set_axis(left.index)
+    )
+    dists = pairs["separation"].reindex(left["candid"]).set_axis(left.index)
 
     return left.assign(
         **{
-            name_column: left["candid"].map(pairs["match_candid"]).map(names),
-            dist_column: left["candid"].map(pairs["separation"]),
+            f"{prefix}name": ids.map(right.set_index("candid")["objectId"]),
+            f"{prefix}id": ids,
+            f"{prefix}dist": dists,
         }
     )
 
@@ -183,8 +190,7 @@ def get_matched_ipac_table(night: str, data_dir: Path | None = None) -> pd.DataF
         get_ipac_table(night, data_dir),
         get_dza_table(night, data_dir),
         get_ipac_matches(night, data_dir),
-        "DZAname",
-        "DZAdist",
+        "DZA",
     )
 
 
@@ -200,8 +206,7 @@ def get_matched_dza_table(night: str, data_dir: Path | None = None) -> pd.DataFr
         get_dza_table(night, data_dir),
         get_ipac_table(night, data_dir),
         get_dza_matches(night, data_dir),
-        "IPACname",
-        "IPACdist",
+        "IPAC",
     )
 
 

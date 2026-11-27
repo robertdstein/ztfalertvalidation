@@ -39,8 +39,8 @@ class TestCrossmatch(unittest.TestCase):
     def setUp(self):
         """Match the example tables"""
         matches = match_tables(IPAC, DZA)
-        matched = add_matches(IPAC, DZA, matches, "DZAname", "DZAdist")
-        self.df = matched.set_index("objectId")[["DZAname", "DZAdist"]]
+        matched = add_matches(IPAC, DZA, matches, "DZA")
+        self.df = matched.set_index("objectId")[["DZAname", "DZAid", "DZAdist"]]
 
     def test_nearest_within_the_cut(self):
         """Test that a source is matched to its nearest counterpart"""
@@ -61,7 +61,7 @@ class TestCrossmatch(unittest.TestCase):
     def test_nearest_is_not_found_in_other_quadrants(self):
         """Test that a source is not matched across exposure quadrants"""
         other = DZA.assign(rcid=9)
-        df = add_matches(IPAC, other, match_tables(IPAC, other), "DZAname", "DZAdist")
+        df = add_matches(IPAC, other, match_tables(IPAC, other), "DZA")
 
         self.assertTrue(df["DZAname"].isna().all())
 
@@ -71,3 +71,13 @@ class TestCrossmatch(unittest.TestCase):
 
         self.assertEqual(list(matches["candid"]), [1, 2])
         self.assertEqual(list(matches["match_candid"]), [20, 10])
+
+    def test_matched_id_is_exact(self):
+        """Test that the matched candid survives, as a float would not"""
+        candid = 3602476230915015004
+        dza = DZA.assign(candid=[candid, 20])
+        df = add_matches(IPAC, dza, match_tables(IPAC, dza), "DZA")
+
+        self.assertEqual(df["DZAid"].dtype, "Int64")
+        self.assertEqual(df.set_index("objectId")["DZAid"].loc["ZTF00b"], candid)
+        self.assertTrue(pd.isna(df.set_index("objectId")["DZAid"].loc["ZTF00c"]))
