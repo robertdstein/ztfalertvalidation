@@ -23,9 +23,7 @@ class TestPaths(unittest.TestCase):
 
             self.assertEqual(list_nights(data_dir), [NIGHT])
             self.assertEqual(get_dza_dir(NIGHT, data_dir).name, "dza")
-            self.assertEqual(
-                get_ipac_dir(NIGHT, data_dir).name, f"ztf_public_{NIGHT}"
-            )
+            self.assertEqual(get_ipac_dir(NIGHT, data_dir).name, f"ztf_public_{NIGHT}")
 
     def test_missing_night(self):
         """Test that an absent night raises, rather than returning a bad path"""
