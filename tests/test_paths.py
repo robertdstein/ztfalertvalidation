@@ -31,4 +31,4 @@ class TestPaths(unittest.TestCase):
         """Test that an absent night raises, rather than returning a bad path"""
         with TemporaryDirectory() as temp_dir:
             with self.assertRaises(FileNotFoundError):
-                get_dza_dir(NIGHT, temp_dir)
+                get_dza_dir(NIGHT, Path(temp_dir))
