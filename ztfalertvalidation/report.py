@@ -11,10 +11,12 @@ import pandas as pd
 from jinja2 import Template
 
 from ztfalertvalidation.checks import (
+    compare_depth,
     compare_photometry,
     compare_quadrants,
     compare_volume,
     fraction_within,
+    get_quadrant_depth,
     list_asymmetric_failures,
 )
 from ztfalertvalidation.checks.quadrants import N_QUADRANTS
@@ -344,6 +346,36 @@ def astrometry_section(night: str, data_dir: Path | None = None) -> Section:
     return Section("Astrometric precision", text, table, {}, message)
 
 
+def depth_section(night: str, data_dir: Path | None = None) -> Section:
+    """
+    Report how deep each pipeline reaches in each quadrant
+
+    :param night: Night, as a 'YYYYMMDD' string
+    :param data_dir: Path to data directory
+    :return: Section of the report
+    """
+    df = compare_depth(night, data_dir)
+    quadrants = len(get_quadrant_depth(night, data_dir))
+
+    table = pd.DataFrame(
+        {"limiting magnitude difference": [f"{x:.6f}" for x in df.iloc[:, 0]]},
+        index=df.index,
+    )
+
+    text = (
+        "The difference between the limiting magnitudes the two pipelines "
+        "report for a quadrant, over the quadrants both processed. Every "
+        "alert of a quadrant carries the same limiting magnitude."
+    )
+
+    message = (
+        f"Over {quadrants:,} quadrants, the limiting magnitudes agree to "
+        f"within {df.iloc[-1, 0]:.6f} magnitudes at the 99th percentile."
+    )
+
+    return Section("Limiting magnitude", text, table, {}, message)
+
+
 def photometry_section(night: str, data_dir: Path | None = None) -> Section:
     """
     Report how closely the two pipelines agree on how bright a source is
@@ -356,28 +388,29 @@ def photometry_section(night: str, data_dir: Path | None = None) -> Section:
     agreeing, pairs = fraction_within(night, MVP_FLUX_FRACTION, data_dir)
 
     table = pd.DataFrame(
-        {
-            "flux difference": [f"{x:.4%}" for x in df["flux difference"]],
-            "magnitude difference": [f"{x:.4f}" for x in df["magnitude difference"]],
-        },
+        {column: [f"{x:.4%}" for x in df[column]] for column in df.columns},
         index=df.index,
     )
 
     text = (
         "The difference between the magnitudes the two pipelines measure for "
-        "a matched source, as a fraction of the flux and as a magnitude, over "
-        "every matched pair."
+        "one matched source, as a fraction of the flux, for the psf "
+        "magnitude and the aperture magnitude."
     )
 
     message = (
         f"{agreeing:,} of {pairs:,} matched pairs agree to within "
         f"{MVP_FLUX_FRACTION:.0%} in flux, which the MVP requires, leaving "
-        f"{pairs - agreeing} that do not. The largest difference is "
-        f"{df.loc['maximum', 'flux difference']:.1%} in flux, "
-        f"{df.loc['maximum', 'magnitude difference']:.3f} magnitudes."
+        f"{pairs - agreeing} that do not."
     )
 
-    return Section("Photometric precision", text, table, {}, message)
+    summary = {
+        f"Sources within {MVP_FLUX_FRACTION:.0%} in flux": (
+            f"{agreeing / pairs:.3%} of matched pairs"
+        ),
+    }
+
+    return Section("Photometric precision", text, table, summary, message)
 
 
 def build_sections(night: str, data_dir: Path | None = None) -> list[Section]:
@@ -394,6 +427,7 @@ def build_sections(night: str, data_dir: Path | None = None) -> list[Section]:
         failure_section(night, data_dir),
         crossmatch_section(night, data_dir),
         astrometry_section(night, data_dir),
+        depth_section(night, data_dir),
         photometry_section(night, data_dir),
     ]
 
