@@ -11,8 +11,10 @@ import pandas as pd
 from jinja2 import Template
 
 from ztfalertvalidation.checks import (
+    compare_photometry,
     compare_quadrants,
     compare_volume,
+    fraction_within,
     list_asymmetric_failures,
 )
 from ztfalertvalidation.checks.quadrants import N_QUADRANTS
@@ -28,6 +30,7 @@ logger = logging.getLogger(__name__)
 N_WORST = 10
 MVP_MATCH_FRACTION = 0.99
 MVP_SEPARATION_ARCSEC = 0.5
+MVP_FLUX_FRACTION = 0.05
 
 
 @dataclass
@@ -341,6 +344,42 @@ def astrometry_section(night: str, data_dir: Path | None = None) -> Section:
     return Section("Astrometric precision", text, table, {}, message)
 
 
+def photometry_section(night: str, data_dir: Path | None = None) -> Section:
+    """
+    Report how closely the two pipelines agree on how bright a source is
+
+    :param night: Night, as a 'YYYYMMDD' string
+    :param data_dir: Path to data directory
+    :return: Section of the report
+    """
+    df = compare_photometry(night, data_dir)
+    agreeing, pairs = fraction_within(night, MVP_FLUX_FRACTION, data_dir)
+
+    table = pd.DataFrame(
+        {
+            "flux difference": [f"{x:.4%}" for x in df["flux difference"]],
+            "magnitude difference": [f"{x:.4f}" for x in df["magnitude difference"]],
+        },
+        index=df.index,
+    )
+
+    text = (
+        "The difference between the magnitudes the two pipelines measure for "
+        "a matched source, as a fraction of the flux and as a magnitude, over "
+        "every matched pair."
+    )
+
+    message = (
+        f"{agreeing:,} of {pairs:,} matched pairs agree to within "
+        f"{MVP_FLUX_FRACTION:.0%} in flux, which the MVP requires, leaving "
+        f"{pairs - agreeing} that do not. The largest difference is "
+        f"{df.loc['maximum', 'flux difference']:.1%} in flux, "
+        f"{df.loc['maximum', 'magnitude difference']:.3f} magnitudes."
+    )
+
+    return Section("Photometric precision", text, table, {}, message)
+
+
 def build_sections(night: str, data_dir: Path | None = None) -> list[Section]:
     """
     Run every check and report it
@@ -355,6 +394,7 @@ def build_sections(night: str, data_dir: Path | None = None) -> list[Section]:
         failure_section(night, data_dir),
         crossmatch_section(night, data_dir),
         astrometry_section(night, data_dir),
+        photometry_section(night, data_dir),
     ]
 
 
