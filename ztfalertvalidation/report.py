@@ -19,6 +19,7 @@ from ztfalertvalidation.checks import (
     get_quadrant_depth,
     list_asymmetric_failures,
 )
+from ztfalertvalidation.checks.photometry import PRIMARY_MAG_COLUMN
 from ztfalertvalidation.checks.quadrants import N_QUADRANTS
 from ztfalertvalidation.crossmatch import (
     MAX_SEPARATION_ARCSEC,
@@ -33,6 +34,10 @@ N_WORST = 10
 MVP_MATCH_FRACTION = 0.99
 MVP_SEPARATION_ARCSEC = 0.5
 MVP_FLUX_FRACTION = 0.05
+PHOTOMETRY_TITLES = {
+    "magpsf": "PSF photometry",
+    "magap": "Aperture photometry",
+}
 
 
 @dataclass
@@ -376,26 +381,31 @@ def depth_section(night: str, data_dir: Path | None = None) -> Section:
     return Section("Limiting magnitude", text, table, {}, message)
 
 
-def photometry_section(night: str, data_dir: Path | None = None) -> Section:
+def photometry_section(
+    night: str, column: str, data_dir: Path | None = None
+) -> Section:
     """
-    Report how closely the two pipelines agree on how bright a source is
+    Report how closely the two pipelines agree on one magnitude of a source
 
     :param night: Night, as a 'YYYYMMDD' string
+    :param column: Magnitude to compare, such as 'magpsf'
     :param data_dir: Path to data directory
     :return: Section of the report
     """
-    df = compare_photometry(night, data_dir)
-    agreeing, pairs = fraction_within(night, MVP_FLUX_FRACTION, data_dir)
+    df = compare_photometry(night, column, data_dir)
+    agreeing, pairs = fraction_within(night, MVP_FLUX_FRACTION, column, data_dir)
 
     table = pd.DataFrame(
-        {column: [f"{x:.4%}" for x in df[column]] for column in df.columns},
+        {
+            "flux difference": [f"{x:.4%}" for x in df["flux difference"]],
+            "magnitude difference": [f"{x:.6f}" for x in df["magnitude difference"]],
+        },
         index=df.index,
     )
 
     text = (
-        "The difference between the magnitudes the two pipelines measure for "
-        "one matched source, as a fraction of the flux, for the psf "
-        "magnitude and the aperture magnitude."
+        f"The difference between the {column} the two pipelines measure for "
+        "one matched source, as a fraction of the flux and as a magnitude."
     )
 
     message = (
@@ -404,13 +414,17 @@ def photometry_section(night: str, data_dir: Path | None = None) -> Section:
         f"{pairs - agreeing} that do not."
     )
 
-    summary = {
-        f"Sources within {MVP_FLUX_FRACTION:.0%} in flux": (
-            f"{agreeing / pairs:.3%} of matched pairs"
-        ),
-    }
+    summary = (
+        {
+            f"Sources within {MVP_FLUX_FRACTION:.0%} in flux": (
+                f"{agreeing / pairs:.3%} of matched pairs"
+            )
+        }
+        if column == PRIMARY_MAG_COLUMN
+        else {}
+    )
 
-    return Section("Photometric precision", text, table, summary, message)
+    return Section(PHOTOMETRY_TITLES[column], text, table, summary, message)
 
 
 def build_sections(night: str, data_dir: Path | None = None) -> list[Section]:
@@ -428,7 +442,8 @@ def build_sections(night: str, data_dir: Path | None = None) -> list[Section]:
         crossmatch_section(night, data_dir),
         astrometry_section(night, data_dir),
         depth_section(night, data_dir),
-        photometry_section(night, data_dir),
+        photometry_section(night, PRIMARY_MAG_COLUMN, data_dir),
+        photometry_section(night, "magap", data_dir),
     ]
 
 

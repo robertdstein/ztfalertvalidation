@@ -75,50 +75,52 @@ def compare_depth(night: str, data_dir: Path | None = None) -> pd.DataFrame:
     return table
 
 
-def compare_photometry(night: str, data_dir: Path | None = None) -> pd.DataFrame:
+def compare_photometry(
+    night: str, column: str, data_dir: Path | None = None
+) -> pd.DataFrame:
     """
-    Compare the magnitudes the two pipelines measure for a matched source
+    Compare one magnitude the two pipelines measure for a matched source
 
-    The difference is given as a fraction of the flux, since that is how the
-    requirement is set, for the psf and the aperture magnitude alike.
+    The difference is given both as a fraction of the flux, since that is how
+    the requirement is set, and as a magnitude.
 
     :param night: Night, as a 'YYYYMMDD' string
+    :param column: Magnitude to compare, such as 'magpsf'
     :param data_dir: Path to data directory
     :return: Table of one row per quantile of the difference
     """
-    pairs = get_matched_pairs(night, MAG_COLUMNS, data_dir)
+    pairs = get_matched_pairs(night, [column], data_dir)
+    delta = pairs[f"{column}_dza"] - pairs[f"{column}_ipac"]
 
     table = pd.DataFrame(
         {
-            column: flux_ratio(pairs[f"{column}_dza"] - pairs[f"{column}_ipac"])
-            .abs()
-            .quantile(QUANTILES)
-            .to_numpy()
-            for column in MAG_COLUMNS
+            "flux difference": flux_ratio(delta).abs().quantile(QUANTILES).to_numpy(),
+            "magnitude difference": delta.abs().quantile(QUANTILES).to_numpy(),
         },
         index=[f"{x:.0%}" for x in QUANTILES],
     )
     table.index.name = "quantile"
 
-    logger.info(f"Compared the photometry of {len(pairs)} matched alerts")
+    logger.info(f"Compared the {column} of {len(pairs)} matched alerts")
 
     return table
 
 
 def fraction_within(
-    night: str, limit: float, data_dir: Path | None = None
+    night: str, limit: float, column: str, data_dir: Path | None = None
 ) -> tuple[int, int]:
     """
-    Count the matched alerts whose psf flux agrees to within a fraction
+    Count the matched alerts whose flux agrees to within a fraction
 
     :param night: Night, as a 'YYYYMMDD' string
     :param limit: Fractional difference in flux to count as agreeing
+    :param column: Magnitude to compare, such as 'magpsf'
     :param data_dir: Path to data directory
     :return: The number agreeing, and the number of matched alerts
     """
-    pairs = get_matched_pairs(night, [PRIMARY_MAG_COLUMN], data_dir)
+    pairs = get_matched_pairs(night, [column], data_dir)
 
-    delta = pairs[f"{PRIMARY_MAG_COLUMN}_dza"] - pairs[f"{PRIMARY_MAG_COLUMN}_ipac"]
+    delta = pairs[f"{column}_dza"] - pairs[f"{column}_ipac"]
     agreeing = int((flux_ratio(delta).abs() < limit).sum())
 
     return agreeing, len(pairs)
