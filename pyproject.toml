@@ -53,7 +53,7 @@ dev = [
 Homepage = "https://github.com/robertdstein/ztfalertvalidation"
 
 [tool.setuptools]
-packages = ["ztfalertvalidation"]
+packages = ["ztfalertvalidation", "ztfalertvalidation.checks"]
 
 [tool.coverage.run]
 source = ["ztfalertvalidation"]
