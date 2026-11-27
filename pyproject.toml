@@ -37,6 +37,7 @@ dependencies = [
     "pyarrow",
     "astropy",
     "scipy",
+    "jinja2",
 ]
 
 [project.optional-dependencies]
