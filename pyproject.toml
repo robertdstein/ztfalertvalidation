@@ -52,8 +52,8 @@ dev = [
 [project.urls]
 Homepage = "https://github.com/robertdstein/ztfalertvalidation"
 
-[tool.setuptools]
-packages = ["ztfalertvalidation"]
+[tool.setuptools.packages.find]
+include = ["ztfalertvalidation*"]
 
 [tool.coverage.run]
 source = ["ztfalertvalidation"]
