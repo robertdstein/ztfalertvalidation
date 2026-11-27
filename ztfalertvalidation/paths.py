@@ -19,7 +19,8 @@ load_dotenv()
 
 DATA_DIR_KEY = "ZTF_DATA_DIR"
 DZA_DIR_NAME = "dza"
-IPAC_DIR_PATTERN = "ztf_public_*"
+IPAC_DIR_PREFIX = "ztf_public_"
+IPAC_DIR_PATTERN = f"{IPAC_DIR_PREFIX}*"
 
 
 def get_data_dir(data_dir: Path | None = None) -> Path:
