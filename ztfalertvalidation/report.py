@@ -15,6 +15,7 @@ from ztfalertvalidation.checks import (
     compare_volume,
     list_asymmetric_failures,
 )
+from ztfalertvalidation.checks.quadrants import N_QUADRANTS
 from ztfalertvalidation.crossmatch import (
     MAX_SEPARATION_ARCSEC,
     get_matched_dza_table,
@@ -80,18 +81,15 @@ def volume_section(night: str, data_dir: Path | None = None) -> Section:
     alerts = df["n_alerts"]
     volume = df["volume_gb"]
     by_count = alerts["dza"] / alerts["ipac"] - 1
-    by_volume = volume["dza"] / volume["ipac"] - 1
 
     text = (
-        "Counts every avro file each pipeline wrote for the night, and the "
-        "space it takes. A pipeline that silently dropped part of the night "
-        "shows up here first, before any alert is read."
+        "The number of avro files each pipeline wrote for the night, their "
+        "total size on disk, and the mean size of one alert."
     )
 
     message = (
         f"DZA produced {abs(by_count):.2%} "
-        f"{'more' if by_count > 0 else 'fewer'} alerts than IPAC, in "
-        f"{abs(by_volume):.2%} {'more' if by_volume > 0 else 'less'} data."
+        f"{'more' if by_count > 0 else 'fewer'} alerts than IPAC."
     )
 
     table = df.round(2).rename(
@@ -152,29 +150,31 @@ def quadrant_section(night: str, data_dir: Path | None = None) -> Section:
         index=list(counts),
     )
 
+    difference = (both["n_dza"] - both["n_ipac"]).abs()
+    differing = len(both) - identical
+
     text = (
-        "Both pipelines see the same raw images, so a quadrant they both "
-        "processed should hold the same number of alerts. Alerts of one "
-        "exposure share a Julian date, and each quadrant read out for that "
-        "exposure has its own rcid, so a quadrant is one detector readout. "
-        "The share of the first rows is of all the night's quadrants, and of "
-        "the last two is of those both pipelines processed. Quadrants neither "
-        "pipeline produced alerts for are the night's dead channels, and say "
-        "nothing about either pipeline."
+        "Both pipelines see the same raw images. Alerts of one exposure share "
+        "a Julian date, and each quadrant read out for that exposure has its "
+        "own rcid, so a quadrant is one detector readout. The share of the "
+        "first five rows is of all the night's quadrants, and of the last two "
+        "is of the quadrants both pipelines processed."
     )
 
     message = (
         f"{identical / len(both):.1%} of the quadrants both pipelines "
-        "processed yield an identical number of alerts."
+        f"processed yield an identical number of alerts. Of the {differing} "
+        f"that differ, {int((difference == 1).sum())} differ by one alert and "
+        f"{int((difference > 1).sum())} by more, the largest difference being "
+        f"{int(difference.max())} alerts. "
+        f"{(difference <= 1).mean():.2%} of shared quadrants agree to within "
+        "one alert."
     )
 
     summary = {
         "Exposures": f"{df.index.levshape[0]:,}",
         "Quadrants processed by both": (
             f"{len(both):,} ({len(both) / len(df):.1%} of the night)"
-        ),
-        "Quadrants with differing counts": (
-            f"{len(both) - identical:,} ({(len(both) - identical) / len(both):.1%})"
         ),
     }
 
@@ -217,26 +217,27 @@ def failure_section(night: str, data_dir: Path | None = None) -> Section:
     table.index = [f"{x:.6f}" for x in table.index]
 
     text = (
-        "A quadrant one pipeline produced alerts for and the other did not at "
-        "all. This is the failure that matters: it is not a detection "
-        "difference but a readout missing from one side, so every source on it "
-        "is lost. Each row is one exposure, and the columns count its "
-        f"quadrants, not its alerts. The {N_WORST} exposures with the most "
-        "affected quadrants are listed, by Julian date; the rest are in the "
-        "table on disk."
+        "One row per exposure, counting the quadrants of that exposure that "
+        "only one pipeline produced alerts for. The "
+        f"{N_WORST} exposures with the most affected quadrants are listed, by "
+        "Julian date; the rest are in the table on disk."
     )
 
     message = (
         f"{affected / n_exposures:.1%} of exposures have at least one quadrant "
-        f"only one pipeline processed. Of the night's quadrants, "
+        f"(out of {N_QUADRANTS}) which was only processed successfully by one "
+        f"of the two pipelines. Of the night's quadrants, "
         f"{ipac_only / len(quadrants):.1%} were processed by IPAC alone and "
         f"{dza_only / len(quadrants):.1%} by DZA alone."
     )
 
     summary = {
-        "Quadrants only IPAC processed": f"{ipac_only:,}",
-        "Quadrants only DZA processed": f"{dza_only:,}",
-        "Exposures affected": f"{affected:,} ({affected / n_exposures:.1%})",
+        "Quadrants only IPAC processed": (
+            f"{ipac_only:,} ({ipac_only / len(quadrants):.1%})"
+        ),
+        "Quadrants only DZA processed": (
+            f"{dza_only:,} ({dza_only / len(quadrants):.1%})"
+        ),
     }
 
     return Section("Asymmetric processing failures", text, table, summary, message)
@@ -278,13 +279,12 @@ def crossmatch_section(night: str, data_dir: Path | None = None) -> Section:
 
     matched = counts["IPAC"][1] / len(ipac)
     text = (
-        "The two pipelines name the same source differently, so sources are "
-        "matched by position within one quadrant of one exposure. A source "
-        f"counts as matched when its counterpart lies within "
-        f'{MAX_SEPARATION_ARCSEC:.0f}". The last row is the one to watch: an '
-        "alert on a quadrant both pipelines processed that still has no "
-        "counterpart is a genuine difference in what they detected, not a "
-        "readout one of them never saw."
+        "Sources are matched by position within one quadrant of one "
+        "exposure, since the two pipelines name the same source differently. "
+        f"A source counts as matched when its counterpart lies within "
+        f'{MAX_SEPARATION_ARCSEC:.0f}". The last row counts alerts on a '
+        "quadrant both pipelines processed that have no counterpart within "
+        "that radius. The shares are of IPAC alerts."
     )
 
     message = (
@@ -296,10 +296,6 @@ def crossmatch_section(night: str, data_dir: Path | None = None) -> Section:
     summary = {
         f'Sources matched (within {MAX_SEPARATION_ARCSEC:.0f}")': (
             f"{counts['IPAC'][1]:,} ({matched:.2%} of IPAC alerts)"
-        ),
-        "Unmatched on a shared quadrant": (
-            f"{counts['IPAC'][4]:,} IPAC ({counts['IPAC'][4] / len(ipac):.2%}) / "
-            f"{counts['DZA'][4]:,} DZA ({counts['DZA'][4] / len(dza):.2%})"
         ),
     }
 
@@ -327,27 +323,22 @@ def astrometry_section(night: str, data_dir: Path | None = None) -> Section:
         index=list(quantiles),
     )
 
-    within = (separations < MVP_SEPARATION_ARCSEC).mean()
+    beyond = int((separations >= MVP_SEPARATION_ARCSEC).sum())
     text = (
-        "How far apart the two pipelines put the same source, over every "
-        "matched pair. This is the astrometric agreement of the two "
-        "pipelines, not their absolute astrometry: a systematic error they "
-        "share cancels out here."
+        "The separation of the two pipelines' positions, over every matched "
+        "pair. These are separations between the two pipelines, not absolute "
+        "astrometry."
     )
 
     message = (
-        f'{within:.2%} of matched pairs lie within {MVP_SEPARATION_ARCSEC}", '
-        f"and the 99th percentile separation is "
-        f'{quantiles["99th percentile"]:.4f}". The MVP requires a match '
-        f'within {MVP_SEPARATION_ARCSEC}", so this requirement '
-        f"{verdict(quantiles['99th percentile'] < MVP_SEPARATION_ARCSEC)}."
+        f"The 99th percentile separation is "
+        f'{quantiles["99th percentile"]:.4f}", within the '
+        f'{MVP_SEPARATION_ARCSEC}" the MVP requires. {beyond} of '
+        f"{len(separations):,} matched pairs lie beyond "
+        f'{MVP_SEPARATION_ARCSEC}", the furthest at {quantiles["maximum"]:.4f}".'
     )
 
-    summary = {
-        "Median separation of a matched pair": f'{quantiles["median"]:.4f}"',
-    }
-
-    return Section("Astrometric precision", text, table, summary, message)
+    return Section("Astrometric precision", text, table, {}, message)
 
 
 def build_sections(night: str, data_dir: Path | None = None) -> list[Section]:
