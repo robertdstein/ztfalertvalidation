@@ -9,6 +9,11 @@ from ztfalertvalidation.checks import (
     compare_volume,
     list_asymmetric_failures,
 )
+from ztfalertvalidation.crossmatch import (
+    add_nearest,
+    get_matched_dza_table,
+    get_matched_ipac_table,
+)
 from ztfalertvalidation.paths import (
     get_data_dir,
     get_dza_dir,

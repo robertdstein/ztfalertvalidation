@@ -26,8 +26,16 @@ def build_example(data_dir: Path) -> None:
     (night_dir / f"ztf_public_{NIGHT}").mkdir(parents=True)
 
     alerts = {
-        "ipac": {"jd": [1.0, 1.0, 1.0], "rcid": [8, 8, 9]},
-        "dza": {"jd": [1.0, 1.0, 2.0], "rcid": [8, 9, 8]},
+        "ipac": {
+            "objectId": ["ZTF00a", "ZTF00b", "ZTF00c"],
+            "jd": [1.0, 1.0, 1.0],
+            "rcid": [8, 8, 9],
+        },
+        "dza": {
+            "objectId": ["ZTF00x", "ZTF00y", "ZTF00z"],
+            "jd": [1.0, 1.0, 2.0],
+            "rcid": [8, 9, 8],
+        },
     }
     for pipeline, values in alerts.items():
         pd.DataFrame(values).to_parquet(night_dir / f"{pipeline}.parquet")
