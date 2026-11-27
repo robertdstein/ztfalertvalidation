@@ -2,6 +2,9 @@
 Tests for caching the alerts of a night as a table
 """
 
+# the avro schema is necessarily the same as the one in test_avro
+# pylint: disable=duplicate-code
+
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
