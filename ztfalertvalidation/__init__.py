@@ -21,6 +21,14 @@ from ztfalertvalidation.paths import (
     get_night_dir,
     list_nights,
 )
+from ztfalertvalidation.report import (
+    Section,
+    build_sections,
+    build_summary,
+    get_programids,
+    render_html,
+    write_html_report,
+)
 from ztfalertvalidation.tables import (
     get_dza_table,
     get_ipac_table,
