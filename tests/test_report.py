@@ -22,6 +22,7 @@ NIGHT = "20261112"
 ALERTS: dict[str, dict[str, list]] = {
     "ipac": {
         "objectId": ["ZTF00a", "ZTF00b"],
+        "candid": [1, 2],
         "jd": [1.0, 1.0],
         "rcid": [8, 8],
         "ra": [10.0, 10.1],
@@ -30,6 +31,7 @@ ALERTS: dict[str, dict[str, list]] = {
     },
     "dza": {
         "objectId": ["ZTF00x"],
+        "candid": [10],
         "jd": [1.0],
         "rcid": [8],
         "ra": [10.0],

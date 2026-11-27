@@ -10,9 +10,11 @@ from ztfalertvalidation.checks import (
     list_asymmetric_failures,
 )
 from ztfalertvalidation.crossmatch import (
-    add_nearest,
+    add_matches,
+    get_ipac_matches,
     get_matched_dza_table,
     get_matched_ipac_table,
+    match_tables,
 )
 from ztfalertvalidation.download import (
     download_ipac_alerts,
