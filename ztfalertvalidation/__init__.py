@@ -14,6 +14,11 @@ from ztfalertvalidation.crossmatch import (
     get_matched_dza_table,
     get_matched_ipac_table,
 )
+from ztfalertvalidation.download import (
+    download_ipac_alerts,
+    get_ipac_url,
+    unpack_alerts,
+)
 from ztfalertvalidation.paths import (
     get_data_dir,
     get_dza_dir,
