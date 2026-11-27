@@ -48,3 +48,23 @@ def compare_quadrants(night: str, data_dir: Path | None = None) -> pd.DataFrame:
     logger.info(f"Found {len(df)} quadrants over {df.index.levshape[0]} exposures")
 
     return df.astype("Int64")
+
+
+def list_asymmetric_failures(night: str, data_dir: Path | None = None) -> pd.DataFrame:
+    """
+    List the quadrants that one pipeline processed and the other did not
+
+    A quadrant that neither pipeline produced alerts for is left out, since
+    nothing distinguishes a quadrant that went unread from one that yielded
+    no alerts.
+
+    :param night: Night, as a 'YYYYMMDD' string
+    :param data_dir: Path to data directory
+    :return: Table with one row per asymmetric processing failure
+    """
+    df = compare_quadrants(night, data_dir)
+    failures = df[(df == 0).any(axis="columns")]
+
+    logger.info(f"Found {len(failures)} asymmetric processing failures")
+
+    return failures
