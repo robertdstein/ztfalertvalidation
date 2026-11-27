@@ -4,7 +4,7 @@ and the official IPAC pipeline
 """
 
 from ztfalertvalidation.avro import load_alerts, load_avro, unpack_record
-from ztfalertvalidation.checks import compare_volume
+from ztfalertvalidation.checks import compare_quadrants, compare_volume
 from ztfalertvalidation.paths import (
     get_data_dir,
     get_dza_dir,
