@@ -25,6 +25,7 @@ from ztfalertvalidation.report import (
     Section,
     build_sections,
     build_summary,
+    get_programids,
     render_html,
     write_html_report,
 )
