@@ -23,7 +23,7 @@ from ztfalertvalidation.checks import (
 )
 from ztfalertvalidation.checks.photometry import PRIMARY_MAG_COLUMN
 from ztfalertvalidation.checks.quadrants import N_QUADRANTS
-from ztfalertvalidation.checks.values import AGREEMENT_LABEL
+from ztfalertvalidation.checks.values import AGREEMENT_LABEL, AGREEMENT_LABELS
 from ztfalertvalidation.crossmatch import (
     MAX_SEPARATION_ARCSEC,
     get_matched_dza_table,
@@ -539,7 +539,10 @@ def value_section(night: str, data_dir: Path | None = None) -> Section:
 
     table = pd.DataFrame(
         {
-            AGREEMENT_LABEL: [f"{x:.1%}" for x in df[AGREEMENT_COLUMN]],
+            **{
+                label: [f"{x:.1%}" for x in df[label]]
+                for label in AGREEMENT_LABELS.values()
+            },
             "median difference": [format_number(x) for x in df["median difference"]],
             "99th pct difference": [
                 format_number(x) for x in df["99th percentile difference"]

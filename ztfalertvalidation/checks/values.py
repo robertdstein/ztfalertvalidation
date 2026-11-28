@@ -14,8 +14,11 @@ from ztfalertvalidation.schema import get_fields
 
 logger = logging.getLogger(__name__)
 
-DECIMAL_PLACES = 3
-AGREEMENT_LABEL = f"within {DECIMAL_PLACES} d.p."
+DECIMAL_PLACES = [2, 3]
+AGREEMENT_LABELS = {x: f"within {x} d.p." for x in DECIMAL_PLACES}
+
+# the strictest of them is the one the report sorts and colours by
+AGREEMENT_LABEL = AGREEMENT_LABELS[max(DECIMAL_PLACES)]
 DIFFERENCE_QUANTILE = 0.99
 DIFFERENCE_LABEL = "99th percentile difference"
 KEY_COLUMNS = ["candid", "objectId"]
@@ -26,8 +29,8 @@ def agreement_of(left: pd.Series, right: pd.Series) -> dict[str, float]:
     Measure how closely one column of two pipelines agrees
 
     A column of numbers counts as agreeing when both values round to the same
-    number of decimal places, and any other column when the two are equal,
-    which is what rounding would come to.
+    value at a number of decimal places, and any other column when the two
+    are equal, which is what rounding would come to.
 
     :param left: Column of one pipeline
     :param right: Column of the other
@@ -38,24 +41,28 @@ def agreement_of(left: pd.Series, right: pd.Series) -> dict[str, float]:
     unmeasured = {"median difference": float("nan"), DIFFERENCE_LABEL: float("nan")}
 
     if both.sum() == 0:
-        return row | unmeasured | {AGREEMENT_LABEL: float("nan")}
+        return row | unmeasured | {x: float("nan") for x in AGREEMENT_LABELS.values()}
 
     if pd.api.types.is_numeric_dtype(left) and pd.api.types.is_numeric_dtype(right):
         a = left[both].to_numpy(dtype="float64")
         b = right[both].to_numpy(dtype="float64")
         difference = np.abs(a - b)
 
-        agreeing = np.round(a, DECIMAL_PLACES) == np.round(b, DECIMAL_PLACES)
-
-        return row | {
-            "median difference": float(np.median(difference)),
-            DIFFERENCE_LABEL: float(np.quantile(difference, DIFFERENCE_QUANTILE)),
-            AGREEMENT_LABEL: float(np.mean(agreeing)),
-        }
+        return (
+            row
+            | {
+                "median difference": float(np.median(difference)),
+                DIFFERENCE_LABEL: float(np.quantile(difference, DIFFERENCE_QUANTILE)),
+            }
+            | {
+                label: float(np.mean(np.round(a, places) == np.round(b, places)))
+                for places, label in AGREEMENT_LABELS.items()
+            }
+        )
 
     equal = float((left[both] == right[both]).mean())
 
-    return row | unmeasured | {AGREEMENT_LABEL: equal}
+    return row | unmeasured | {x: equal for x in AGREEMENT_LABELS.values()}
 
 
 def compare_values(night: str, data_dir: Path | None = None) -> pd.DataFrame:
