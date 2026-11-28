@@ -5,8 +5,12 @@ and the official IPAC pipeline
 
 from ztfalertvalidation.avro import load_alerts, load_avro, unpack_record
 from ztfalertvalidation.checks import (
+    compare_depth,
+    compare_photometry,
     compare_quadrants,
     compare_volume,
+    fraction_within,
+    get_quadrant_depth,
     list_asymmetric_failures,
 )
 from ztfalertvalidation.crossmatch import (

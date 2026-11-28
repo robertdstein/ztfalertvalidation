@@ -28,6 +28,9 @@ ALERTS: dict[str, dict[str, list]] = {
         "ra": [10.0, 10.1],
         "dec": [20.0, 20.0],
         "programid": [1, 1],
+        "magpsf": [19.5, 18.0],
+        "magap": [19.6, 18.1],
+        "diffmaglim": [20.3, 20.3],
     },
     "dza": {
         "objectId": ["ZTF00x"],
@@ -37,6 +40,9 @@ ALERTS: dict[str, dict[str, list]] = {
         "ra": [10.0],
         "dec": [20.0],
         "programid": [1],
+        "magpsf": [19.5],
+        "magap": [19.6],
+        "diffmaglim": [20.3],
     },
 }
 
@@ -80,11 +86,14 @@ class TestReport(unittest.TestCase):
                 self.assertIn(title, page)
 
             self.assertIn("Astrometric precision", page)
+            self.assertIn("Limiting magnitude", page)
+            self.assertIn("PSF photometry", page)
+            self.assertIn("Aperture photometry", page)
             self.assertIn(NIGHT, page)
             self.assertIn("programid 1", page)
 
             # each section ends in its take-home message
-            self.assertEqual(page.count('class="message"'), 5)
+            self.assertEqual(page.count('class="message"'), 8)
 
     def test_summary_collects_the_sections(self):
         """Test that the summary holds the night and each section's numbers"""
