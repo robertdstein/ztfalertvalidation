@@ -6,6 +6,7 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+import fastavro
 import pandas as pd
 
 from ztfalertvalidation import (
@@ -18,6 +19,37 @@ from ztfalertvalidation import (
 from ztfalertvalidation.report import quadrant_section
 
 NIGHT = "20261112"
+
+CANDIDATE_FIELDS = [
+    ("jd", "double", "Observation Julian date at start of exposure [days]"),
+    ("rcid", "int", "Readout channel ID [00 .. 63]"),
+    ("ra", "double", "Right Ascension of candidate [deg]"),
+    ("dec", "double", "Declination of candidate [deg]"),
+    ("programid", "int", "Program ID"),
+    ("magpsf", "float", "Magnitude from PSF-fit photometry [mag]"),
+    ("magap", "float", "Aperture mag using 14 pixel diameter aperture [mag]"),
+    ("diffmaglim", "float", "Expected 5-sigma mag limit in difference image"),
+]
+
+SCHEMA = {
+    "type": "record",
+    "name": "ztf.alert",
+    "fields": [
+        {"name": "objectId", "type": "string", "doc": "object identifier"},
+        {"name": "candid", "type": "long", "doc": "Candidate ID"},
+        {
+            "name": "candidate",
+            "type": {
+                "type": "record",
+                "name": "ztf.alert.candidate",
+                "fields": [
+                    {"name": name, "type": kind, "doc": doc}
+                    for name, kind, doc in CANDIDATE_FIELDS
+                ],
+            },
+        },
+    ],
+}
 
 ALERTS: dict[str, dict[str, list]] = {
     "ipac": {
@@ -47,9 +79,28 @@ ALERTS: dict[str, dict[str, list]] = {
 }
 
 
+def write_alert(path: Path, values: dict[str, list], row: int) -> None:
+    """
+    Write one alert, so that the schema of the night can be read from it
+
+    :param path: Avro file to write
+    :param values: Columns of the pipeline's alerts
+    :param row: Row of those columns to write
+    :return: None
+    """
+    record = {
+        "objectId": values["objectId"][row],
+        "candid": values["candid"][row],
+        "candidate": {name: values[name][row] for name, _, _ in CANDIDATE_FIELDS},
+    }
+
+    with open(path, "wb") as avro_f:
+        fastavro.writer(avro_f, SCHEMA, [record])
+
+
 def build_example(data_dir: Path) -> None:
     """
-    Write a night of cached tables, and the avro files the volume check counts
+    Write a night of cached tables, and the avro files the checks read
 
     :param data_dir: Path to data directory
     :return: None
@@ -59,8 +110,8 @@ def build_example(data_dir: Path) -> None:
 
     for pipeline, values in ALERTS.items():
         alert_dirs[pipeline].mkdir(parents=True)
-        for name in values["objectId"]:
-            (alert_dirs[pipeline] / f"{name}.avro").write_bytes(b"x" * 1000)
+        for row, name in enumerate(values["objectId"]):
+            write_alert(alert_dirs[pipeline] / f"{name}.avro", values, row)
         pd.DataFrame(values).to_parquet(night_dir / f"{pipeline}.parquet")
 
 
@@ -86,6 +137,10 @@ class TestReport(unittest.TestCase):
                 self.assertIn(title, page)
 
             self.assertIn("Astrometric precision", page)
+            self.assertIn("Alert columns", page)
+            self.assertIn("Column agreement", page)
+            self.assertIn("Solar system columns", page)
+            self.assertIn("History columns", page)
             self.assertIn("Limiting magnitude", page)
             self.assertIn("PSF photometry", page)
             self.assertIn("Aperture photometry", page)
@@ -93,7 +148,7 @@ class TestReport(unittest.TestCase):
             self.assertIn("programid 1", page)
 
             # each section ends in its take-home message
-            self.assertEqual(page.count('class="message"'), 8)
+            self.assertEqual(page.count('class="message"'), 12)
 
     def test_summary_collects_the_sections(self):
         """Test that the summary holds the night and each section's numbers"""
@@ -139,3 +194,14 @@ class TestReport(unittest.TestCase):
             self.assertEqual(table.loc["quadrants in the night"], 64)
             self.assertEqual(table.loc["with alerts from both pipelines"], 1)
             self.assertEqual(table.loc["with no alerts from either pipeline"], 63)
+
+    def test_agreement_is_colour_coded(self):
+        """Test that a column's agreement carries a class the page can colour"""
+        with TemporaryDirectory() as temp_dir:
+            data_dir = Path(temp_dir)
+            build_example(data_dir)
+
+            page = data_dir / "report.html"
+            write_html_report(NIGHT, page, data_dir)
+
+            self.assertIn('class="agree-', page.read_text())

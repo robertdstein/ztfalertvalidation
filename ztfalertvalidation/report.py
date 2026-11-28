@@ -11,9 +11,11 @@ import pandas as pd
 from jinja2 import Template
 
 from ztfalertvalidation.checks import (
+    compare_columns,
     compare_depth,
     compare_photometry,
     compare_quadrants,
+    compare_values,
     compare_volume,
     fraction_within,
     get_quadrant_depth,
@@ -21,6 +23,12 @@ from ztfalertvalidation.checks import (
 )
 from ztfalertvalidation.checks.photometry import PRIMARY_MAG_COLUMN
 from ztfalertvalidation.checks.quadrants import N_QUADRANTS
+from ztfalertvalidation.checks.values import (
+    AGREEMENT_LABEL,
+    AGREEMENT_LABELS,
+    HISTORY_GROUP,
+    SOLAR_SYSTEM_GROUP,
+)
 from ztfalertvalidation.crossmatch import (
     MAX_SEPARATION_ARCSEC,
     get_matched_dza_table,
@@ -34,6 +42,38 @@ N_WORST = 10
 MVP_MATCH_FRACTION = 0.99
 MVP_SEPARATION_ARCSEC = 0.5
 MVP_FLUX_FRACTION = 0.05
+# the table rounds agreement to 100.0% from here up
+FULL_AGREEMENT = 0.9995
+AGREEMENT_BANDS = {
+    "agree-full": FULL_AGREEMENT,
+    "agree-high": 0.99,
+    "agree-mid": 0.9,
+}
+AGREEMENT_COLUMN = AGREEMENT_LABEL
+VALUE_TITLES = {
+    "": "Column agreement",
+    SOLAR_SYSTEM_GROUP: "Solar system columns",
+    HISTORY_GROUP: "History columns",
+}
+VALUE_TEXTS = {
+    "": (
+        "One row per column of an alert, over every matched pair of the "
+        "night. A column of numbers agrees where both values round to the "
+        "same two decimal places, and any other column where the two are "
+        "equal. The object name and the candid are left out. The history and "
+        "solar system columns are tabled separately below."
+    ),
+    SOLAR_SYSTEM_GROUP: (
+        "The columns describing the nearest known solar system object "
+        "within 30 arcsec, over the same matched pairs."
+    ),
+    HISTORY_GROUP: (
+        "The columns counting back over the survey, over the same matched "
+        "pairs. The two pipelines do not share a history, so these are "
+        "measured but not checked, and are greyed out. jdendhist is not among "
+        "them."
+    ),
+}
 PHOTOMETRY_TITLES = {
     "magpsf": "PSF photometry",
     "magap": "Aperture photometry",
@@ -51,6 +91,61 @@ class Section:
     table: pd.DataFrame
     summary: dict[str, str]
     message: str
+    classes: pd.DataFrame | None = None
+
+
+def format_number(value: float) -> str:
+    """
+    Render a number for the report, or a dash where there is none
+
+    :param value: Number to render
+    :return: The number, to three figures
+    """
+    return "&mdash;" if pd.isna(value) else f"{value:.3g}"
+
+
+def band_of(agreement: float, checked: bool = True) -> str:
+    """
+    Get the css class a column's agreement falls in
+
+    :param agreement: Fraction of pairs whose values agree
+    :param checked: Whether the column is being checked at all
+    :return: Css class for the cell
+    """
+    if not checked:
+        return "agree-ignored"
+
+    for name, limit in AGREEMENT_BANDS.items():
+        if agreement >= limit:
+            return name
+
+    return "agree-low"
+
+
+def render_table(table: pd.DataFrame, classes: pd.DataFrame | None = None) -> str:
+    """
+    Render a table as html, giving each cell the class the caller asks for
+
+    :param table: Table to render
+    :param classes: Css class of each cell, if any are to be coloured
+    :return: The table, as html
+    """
+    head = "".join(
+        f"<th>{x}</th>" for x in [table.index.name or ""] + list(table.columns)
+    )
+    rows = []
+
+    for name, row in table.iterrows():
+        cells = ""
+        for column, value in row.items():
+            style = "" if classes is None else f' class="{classes.loc[name, column]}"'
+            cells += f"<td{style}>{value}</td>"
+        rows.append(f"<tr><th>{name}</th>{cells}</tr>")
+
+    return (
+        f"<table><thead><tr>{head}</tr></thead>"
+        f"<tbody>{''.join(rows)}</tbody></table>"
+    )
 
 
 def verdict(passed: bool) -> str:
@@ -131,8 +226,7 @@ def quadrant_section(night: str, data_dir: Path | None = None) -> Section:
     """
     df = compare_quadrants(night, data_dir)
 
-    # a quadrant neither pipeline produced alerts for counts NA, not zero, and
-    # a comparison against NA is NA, which .all() would otherwise skip over
+    # a comparison against NA is NA, which .all() skips over
     read_out = df.dropna()
     both = read_out[(read_out > 0).all(axis="columns")]
 
@@ -427,6 +521,94 @@ def photometry_section(
     return Section(PHOTOMETRY_TITLES[column], text, table, summary, message)
 
 
+def column_section(night: str, data_dir: Path | None = None) -> Section:
+    """
+    Report whether the two pipelines write the same columns
+
+    :param night: Night, as a 'YYYYMMDD' string
+    :param data_dir: Path to data directory
+    :return: Section of the report
+    """
+    df = compare_columns(night, data_dir)
+
+    counts = {
+        "in both pipelines": int(df["ipac"].notna().sum() & df["dza"].notna().sum()),
+        "only in IPAC": int((df["ipac"].notna() & df["dza"].isna()).sum()),
+        "only in DZA": int((df["dza"].notna() & df["ipac"].isna()).sum()),
+        "with a differing type": int(
+            (df["ipac"].notna() & df["dza"].notna() & ~df["agrees"]).sum()
+        ),
+    }
+    table = pd.DataFrame({"columns": list(counts.values())}, index=list(counts))
+
+    text = (
+        "The columns of an unpacked alert, with the type given by the schema "
+        "each pipeline wrote its alerts with. The cutouts, the previous "
+        "candidates and the forced photometry history are left out, as they "
+        "are when an alert is unpacked."
+    )
+
+    missing = len(df) - int(df["agrees"].sum())
+    message = (
+        f"{int(df['agrees'].sum())} of {len(df)} columns are written by both "
+        f"pipelines with the same type"
+        + (
+            "."
+            if missing == 0
+            else f", leaving {missing} that are not: "
+            f"{', '.join(df.index[~df['agrees']])}."
+        )
+    )
+
+    return Section("Alert columns", text, table, {}, message)
+
+
+def value_section(night: str, group: str = "", data_dir: Path | None = None) -> Section:
+    """
+    Report how closely each column of a matched alert agrees
+
+    :param night: Night, as a 'YYYYMMDD' string
+    :param group: Group of columns to report, or all the rest by default
+    :param data_dir: Path to data directory
+    :return: Section of the report
+    """
+    values = compare_values(night, data_dir)
+    df = values[values["group"] == group].sort_values(
+        ["checked", AGREEMENT_COLUMN, "median difference"],
+        ascending=[False, True, True],
+    )
+
+    table = pd.DataFrame(
+        {
+            **{
+                label: [f"{x:.1%}" for x in df[label]]
+                for label in AGREEMENT_LABELS.values()
+            },
+            "median difference": [format_number(x) for x in df["median difference"]],
+            "99th pct difference": [
+                format_number(x) for x in df["99th percentile difference"]
+            ],
+            "description": df["description"],
+        },
+        index=df.index,
+    )
+
+    bands = [
+        band_of(x, checked) for x, checked in zip(df[AGREEMENT_COLUMN], df["checked"])
+    ]
+    classes = pd.DataFrame({x: bands for x in table.columns}, index=table.index)
+
+    full = int((df[AGREEMENT_COLUMN] >= FULL_AGREEMENT).sum())
+    poor = int((df[AGREEMENT_COLUMN] < 0.9).sum())
+    message = (
+        f"{full} of {len(df)} columns agree to two decimal places for at "
+        f"least {FULL_AGREEMENT:.2%} of matched pairs, and {poor} agree for "
+        f"fewer than 90% of them."
+    )
+
+    return Section(VALUE_TITLES[group], VALUE_TEXTS[group], table, {}, message, classes)
+
+
 def build_sections(night: str, data_dir: Path | None = None) -> list[Section]:
     """
     Run every check and report it
@@ -437,6 +619,7 @@ def build_sections(night: str, data_dir: Path | None = None) -> list[Section]:
     """
     return [
         volume_section(night, data_dir),
+        column_section(night, data_dir),
         quadrant_section(night, data_dir),
         failure_section(night, data_dir),
         crossmatch_section(night, data_dir),
@@ -444,6 +627,9 @@ def build_sections(night: str, data_dir: Path | None = None) -> list[Section]:
         depth_section(night, data_dir),
         photometry_section(night, PRIMARY_MAG_COLUMN, data_dir),
         photometry_section(night, "magap", data_dir),
+        value_section(night, data_dir=data_dir),
+        value_section(night, SOLAR_SYSTEM_GROUP, data_dir),
+        value_section(night, HISTORY_GROUP, data_dir),
     ]
 
 
@@ -543,6 +729,15 @@ td { font-variant-numeric: tabular-nums; }
 .summary table { font-size: 0.95rem; }
 .summary thead { display: none; }
 .summary td:last-child { font-weight: 600; }
+.agree-full { background: rgba(38, 140, 86, 0.16); }
+.agree-high { background: rgba(140, 160, 40, 0.16); }
+.agree-mid { background: rgba(200, 130, 30, 0.20); }
+.agree-low { background: rgba(190, 60, 60, 0.20); }
+.agree-ignored { color: var(--faint); }
+td.description, .agree-full, .agree-high, .agree-mid, .agree-low,
+.agree-ignored {
+  white-space: normal;
+}
 .message {
   border-left: 3px solid var(--accent);
   background: var(--panel);
@@ -600,12 +795,12 @@ def render_html(sections: list[Section], night: str, programids: list[int]) -> s
         night=night,
         programids=", ".join(str(x) for x in programids),
         generated=datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
-        summary=build_summary(sections, night).to_html(border=0, header=False),
+        summary=render_table(build_summary(sections, night)),
         sections=[
             {
                 "title": x.title,
                 "text": x.text,
-                "html": x.table.to_html(border=0),
+                "html": render_table(x.table, x.classes),
                 "message": x.message,
             }
             for x in sections

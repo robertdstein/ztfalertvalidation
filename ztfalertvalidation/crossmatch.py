@@ -159,8 +159,6 @@ def add_matches(
     """
     pairs = matches.set_index("candid")
 
-    # the columns are looked up by candid, then given the rows' own index, so
-    # that assigning them keeps the nullable integer rather than casting
     ids = (
         pairs["match_candid"]
         .astype("Int64")
