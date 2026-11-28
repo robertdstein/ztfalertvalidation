@@ -32,6 +32,10 @@ from ztfalertvalidation.paths import (
     get_night_dir,
     list_nights,
 )
+from ztfalertvalidation.plots import (
+    find_matched_pair,
+    plot_alert_pair,
+)
 from ztfalertvalidation.report import (
     Section,
     build_sections,

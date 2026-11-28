@@ -37,6 +37,7 @@ dependencies = [
     "pyarrow",
     "astropy",
     "scipy",
+    "matplotlib",
     "jinja2",
 ]
 
