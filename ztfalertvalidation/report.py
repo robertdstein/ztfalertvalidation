@@ -42,7 +42,14 @@ N_WORST = 10
 MVP_MATCH_FRACTION = 0.99
 MVP_SEPARATION_ARCSEC = 0.5
 MVP_FLUX_FRACTION = 0.05
-AGREEMENT_BANDS = {"agree-full": 1.0, "agree-high": 0.99, "agree-mid": 0.9}
+# the table shows agreement to a tenth of a percent, so anything from here
+# up reads as 100.0% and is coloured as full agreement
+FULL_AGREEMENT = 0.9995
+AGREEMENT_BANDS = {
+    "agree-full": FULL_AGREEMENT,
+    "agree-high": 0.99,
+    "agree-mid": 0.9,
+}
 AGREEMENT_COLUMN = AGREEMENT_LABEL
 VALUE_TITLES = {
     "": "Column agreement",
@@ -594,11 +601,12 @@ def value_section(night: str, group: str = "", data_dir: Path | None = None) -> 
     ]
     classes = pd.DataFrame({x: bands for x in table.columns}, index=table.index)
 
-    full = int((df[AGREEMENT_COLUMN] == 1).sum())
+    full = int((df[AGREEMENT_COLUMN] >= FULL_AGREEMENT).sum())
     poor = int((df[AGREEMENT_COLUMN] < 0.9).sum())
     message = (
-        f"{full} of {len(df)} columns agree to two decimal places for every "
-        f"matched pair, and {poor} agree for fewer than 90% of them."
+        f"{full} of {len(df)} columns agree to two decimal places for at "
+        f"least {FULL_AGREEMENT:.2%} of matched pairs, and {poor} agree for "
+        f"fewer than 90% of them."
     )
 
     return Section(VALUE_TITLES[group], VALUE_TEXTS[group], table, {}, message, classes)
