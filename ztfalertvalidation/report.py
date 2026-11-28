@@ -529,6 +529,9 @@ def value_section(night: str, data_dir: Path | None = None) -> Section:
             "within 3 s.f.": [f"{x:.1%}" for x in df["within 3 s.f."]],
             "within 5 s.f.": [f"{x:.1%}" for x in df[AGREEMENT_COLUMN]],
             "median difference": [f"{x:.3g}" for x in df["median difference"]],
+            "99th pct difference": [
+                f"{x:.3g}" for x in df["99th percentile difference"]
+            ],
             "description": df["description"],
         },
         index=df.index,

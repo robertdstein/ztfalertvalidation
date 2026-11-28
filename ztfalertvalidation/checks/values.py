@@ -15,6 +15,8 @@ from ztfalertvalidation.schema import get_fields
 logger = logging.getLogger(__name__)
 
 SIGNIFICANT_FIGURES = [3, 5]
+DIFFERENCE_QUANTILE = 0.99
+DIFFERENCE_LABEL = "99th percentile difference"
 KEY_COLUMNS = ["candid", "objectId"]
 
 
@@ -50,10 +52,15 @@ def agreement_of(left: pd.Series, right: pd.Series) -> dict[str, float]:
     both = left.notna() & right.notna()
     row: dict[str, float] = {"compared": float(both.sum())}
 
+    nothing = {
+        "median difference": float("nan"),
+        DIFFERENCE_LABEL: float("nan"),
+    }
+
     if both.sum() == 0:
         return (
             row
-            | {"median difference": float("nan")}
+            | nothing
             | {f"within {x} s.f.": float("nan") for x in SIGNIFICANT_FIGURES}
         )
 
@@ -61,7 +68,9 @@ def agreement_of(left: pd.Series, right: pd.Series) -> dict[str, float]:
         a = left[both].to_numpy(dtype="float64")
         b = right[both].to_numpy(dtype="float64")
 
-        row["median difference"] = float(np.median(np.abs(a - b)))
+        difference = np.abs(a - b)
+        row["median difference"] = float(np.median(difference))
+        row[DIFFERENCE_LABEL] = float(np.quantile(difference, DIFFERENCE_QUANTILE))
         for digits in SIGNIFICANT_FIGURES:
             rounded = round_to_significant(a, digits)
             agreeing = rounded == round_to_significant(b, digits)
