@@ -58,22 +58,21 @@ VALUE_TITLES = {
 }
 VALUE_TEXTS = {
     "": (
-        "The value of each column of a matched pair, compared over every pair "
-        "of the night. A column of numbers counts as agreeing when both "
-        "values round to the same two decimal places, and any other column "
-        "when the two are equal. The object name and the candid are left out, "
-        "since the two pipelines give a source different ones by design. The "
-        "history and solar system columns have tables of their own below."
+        "One row per column of an alert, over every matched pair of the "
+        "night. A column of numbers agrees where both values round to the "
+        "same two decimal places, and any other column where the two are "
+        "equal. The object name and the candid are left out. The history and "
+        "solar system columns are tabled separately below."
     ),
     SOLAR_SYSTEM_GROUP: (
-        "The columns describing the nearest known solar system object within "
-        "30 arcsec, taken from the MPC archive, over the same matched pairs."
+        "The columns describing the nearest known solar system object "
+        "within 30 arcsec, over the same matched pairs."
     ),
     HISTORY_GROUP: (
-        "The columns counting back over the survey. The two pipelines do not "
-        "share a history, so these are measured but not checked, and are "
-        "greyed out. jdendhist is not among them: it is the epoch of the "
-        "latest detection, which both pipelines see."
+        "The columns counting back over the survey, over the same matched "
+        "pairs. The two pipelines do not share a history, so these are "
+        "measured but not checked, and are greyed out. jdendhist is not among "
+        "them."
     ),
 }
 PHOTOMETRY_TITLES = {
@@ -545,10 +544,10 @@ def column_section(night: str, data_dir: Path | None = None) -> Section:
     table = pd.DataFrame({"columns": list(counts.values())}, index=list(counts))
 
     text = (
-        "The columns of an unpacked alert, taken from the schema each "
-        "pipeline wrote its alerts with, since an avro file carries its own. "
-        "The cutouts, the previous candidates and the forced photometry "
-        "history are left out, as they are when an alert is unpacked."
+        "The columns of an unpacked alert, with the type given by the schema "
+        "each pipeline wrote its alerts with. The cutouts, the previous "
+        "candidates and the forced photometry history are left out, as they "
+        "are when an alert is unpacked."
     )
 
     missing = len(df) - int(df["agrees"].sum())
