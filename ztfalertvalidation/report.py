@@ -23,6 +23,7 @@ from ztfalertvalidation.checks import (
 )
 from ztfalertvalidation.checks.photometry import PRIMARY_MAG_COLUMN
 from ztfalertvalidation.checks.quadrants import N_QUADRANTS
+from ztfalertvalidation.checks.values import AGREEMENT_LABEL
 from ztfalertvalidation.crossmatch import (
     MAX_SEPARATION_ARCSEC,
     get_matched_dza_table,
@@ -37,7 +38,7 @@ MVP_MATCH_FRACTION = 0.99
 MVP_SEPARATION_ARCSEC = 0.5
 MVP_FLUX_FRACTION = 0.05
 AGREEMENT_BANDS = {"agree-full": 1.0, "agree-high": 0.99, "agree-mid": 0.9}
-AGREEMENT_COLUMN = "within 5 s.f."
+AGREEMENT_COLUMN = AGREEMENT_LABEL
 PHOTOMETRY_TITLES = {
     "magpsf": "PSF photometry",
     "magap": "Aperture photometry",
@@ -526,8 +527,7 @@ def value_section(night: str, data_dir: Path | None = None) -> Section:
 
     table = pd.DataFrame(
         {
-            "within 3 s.f.": [f"{x:.1%}" for x in df["within 3 s.f."]],
-            "within 5 s.f.": [f"{x:.1%}" for x in df[AGREEMENT_COLUMN]],
+            AGREEMENT_LABEL: [f"{x:.1%}" for x in df[AGREEMENT_COLUMN]],
             "median difference": [f"{x:.3g}" for x in df["median difference"]],
             "99th pct difference": [
                 f"{x:.3g}" for x in df["99th percentile difference"]
@@ -543,8 +543,9 @@ def value_section(night: str, data_dir: Path | None = None) -> Section:
     text = (
         "The value of each column of a matched pair, compared over every pair "
         "of the night. A column of numbers counts as agreeing when both "
-        "values round to the same number of significant figures, and any "
-        "other column when the two are equal. The object name and the candid "
+        "values round to the same three decimal places, and any "
+        "other column when the two are equal to three decimal places. The "
+        "object name and the candid "
         "are left out, since the two pipelines give a source different ones "
         "by design."
     )
@@ -552,7 +553,7 @@ def value_section(night: str, data_dir: Path | None = None) -> Section:
     full = int((df[AGREEMENT_COLUMN] == 1).sum())
     poor = int((df[AGREEMENT_COLUMN] < 0.9).sum())
     message = (
-        f"{full} of {len(df)} columns agree to 5 significant figures for "
+        f"{full} of {len(df)} columns agree to three decimal places for "
         f"every matched pair, and {poor} agree for fewer than 90% of them."
     )
 

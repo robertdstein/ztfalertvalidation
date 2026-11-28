@@ -14,36 +14,20 @@ from ztfalertvalidation.schema import get_fields
 
 logger = logging.getLogger(__name__)
 
-SIGNIFICANT_FIGURES = [3, 5]
+DECIMAL_PLACES = 3
+AGREEMENT_LABEL = f"within {DECIMAL_PLACES} d.p."
 DIFFERENCE_QUANTILE = 0.99
 DIFFERENCE_LABEL = "99th percentile difference"
 KEY_COLUMNS = ["candid", "objectId"]
-
-
-def round_to_significant(values: np.ndarray, digits: int) -> np.ndarray:
-    """
-    Round values to a number of significant figures
-
-    :param values: Values to round
-    :param digits: Significant figures to keep
-    :return: The rounded values
-    """
-    out = np.asarray(values, dtype="float64")
-    scale = np.zeros_like(out)
-
-    usable = np.isfinite(out) & (out != 0)
-    scale[usable] = digits - 1 - np.floor(np.log10(np.abs(out[usable])))
-
-    return np.where(usable, np.round(out * 10.0**scale) / 10.0**scale, out)
 
 
 def agreement_of(left: pd.Series, right: pd.Series) -> dict[str, float]:
     """
     Measure how closely one column of two pipelines agrees
 
-    A column of numbers is compared by rounding both to a number of
-    significant figures, and any other column by equality, which is what
-    rounding would come to.
+    A column of numbers counts as agreeing when both values round to the same
+    number of decimal places, and any other column when the two are equal,
+    which is what rounding would come to.
 
     :param left: Column of one pipeline
     :param right: Column of the other
@@ -51,39 +35,27 @@ def agreement_of(left: pd.Series, right: pd.Series) -> dict[str, float]:
     """
     both = left.notna() & right.notna()
     row: dict[str, float] = {"compared": float(both.sum())}
-
-    nothing = {
-        "median difference": float("nan"),
-        DIFFERENCE_LABEL: float("nan"),
-    }
+    unmeasured = {"median difference": float("nan"), DIFFERENCE_LABEL: float("nan")}
 
     if both.sum() == 0:
-        return (
-            row
-            | nothing
-            | {f"within {x} s.f.": float("nan") for x in SIGNIFICANT_FIGURES}
-        )
+        return row | unmeasured | {AGREEMENT_LABEL: float("nan")}
 
     if pd.api.types.is_numeric_dtype(left) and pd.api.types.is_numeric_dtype(right):
         a = left[both].to_numpy(dtype="float64")
         b = right[both].to_numpy(dtype="float64")
-
         difference = np.abs(a - b)
-        row["median difference"] = float(np.median(difference))
-        row[DIFFERENCE_LABEL] = float(np.quantile(difference, DIFFERENCE_QUANTILE))
-        for digits in SIGNIFICANT_FIGURES:
-            rounded = round_to_significant(a, digits)
-            agreeing = rounded == round_to_significant(b, digits)
-            row[f"within {digits} s.f."] = float(np.mean(agreeing))
 
-        return row
+        agreeing = np.round(a, DECIMAL_PLACES) == np.round(b, DECIMAL_PLACES)
+
+        return row | {
+            "median difference": float(np.median(difference)),
+            DIFFERENCE_LABEL: float(np.quantile(difference, DIFFERENCE_QUANTILE)),
+            AGREEMENT_LABEL: float(np.mean(agreeing)),
+        }
 
     equal = float((left[both] == right[both]).mean())
-    return (
-        row
-        | {"median difference": float("nan")}
-        | {f"within {x} s.f.": equal for x in SIGNIFICANT_FIGURES}
-    )
+
+    return row | unmeasured | {AGREEMENT_LABEL: equal}
 
 
 def compare_values(night: str, data_dir: Path | None = None) -> pd.DataFrame:
