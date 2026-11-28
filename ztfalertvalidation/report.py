@@ -42,8 +42,7 @@ N_WORST = 10
 MVP_MATCH_FRACTION = 0.99
 MVP_SEPARATION_ARCSEC = 0.5
 MVP_FLUX_FRACTION = 0.05
-# the table shows agreement to a tenth of a percent, so anything from here
-# up reads as 100.0% and is coloured as full agreement
+# the table rounds agreement to 100.0% from here up
 FULL_AGREEMENT = 0.9995
 AGREEMENT_BANDS = {
     "agree-full": FULL_AGREEMENT,
@@ -227,8 +226,7 @@ def quadrant_section(night: str, data_dir: Path | None = None) -> Section:
     """
     df = compare_quadrants(night, data_dir)
 
-    # a quadrant neither pipeline produced alerts for counts NA, not zero, and
-    # a comparison against NA is NA, which .all() would otherwise skip over
+    # a comparison against NA is NA, which .all() skips over
     read_out = df.dropna()
     both = read_out[(read_out > 0).all(axis="columns")]
 

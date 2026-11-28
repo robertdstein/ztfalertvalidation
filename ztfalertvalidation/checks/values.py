@@ -20,9 +20,6 @@ AGREEMENT_LABELS = {x: f"within {x} d.p." for x in DECIMAL_PLACES}
 # the loosest of them is the one the report sorts and colours by
 AGREEMENT_LABEL = AGREEMENT_LABELS[min(DECIMAL_PLACES)]
 
-# the two pipelines do not share a history, so the columns counting back over
-# one are not checked until they do. jdendhist is not among them: it is the
-# epoch of the latest detection, which both pipelines see
 CHECK_HISTORY = False
 HISTORY_GROUP = "history"
 HISTORY_COLUMNS = ["ncovhist", "ndethist", "jdstarthist"]
