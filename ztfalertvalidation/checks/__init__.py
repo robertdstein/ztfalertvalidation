@@ -2,6 +2,7 @@
 Checks comparing the alerts of the two pipelines
 """
 
+from ztfalertvalidation.checks.columns import compare_columns
 from ztfalertvalidation.checks.photometry import (
     compare_depth,
     compare_photometry,
@@ -12,4 +13,5 @@ from ztfalertvalidation.checks.quadrants import (
     compare_quadrants,
     list_asymmetric_failures,
 )
+from ztfalertvalidation.checks.values import compare_values
 from ztfalertvalidation.checks.volume import compare_volume
