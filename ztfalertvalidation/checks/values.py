@@ -51,9 +51,11 @@ def agreement_of(left: pd.Series, right: pd.Series) -> dict[str, float]:
     row: dict[str, float] = {"compared": float(both.sum())}
 
     if both.sum() == 0:
-        return row | {"median difference": float("nan")} | {
-            f"within {x} s.f.": float("nan") for x in SIGNIFICANT_FIGURES
-        }
+        return (
+            row
+            | {"median difference": float("nan")}
+            | {f"within {x} s.f.": float("nan") for x in SIGNIFICANT_FIGURES}
+        )
 
     if pd.api.types.is_numeric_dtype(left) and pd.api.types.is_numeric_dtype(right):
         a = left[both].to_numpy(dtype="float64")
@@ -68,9 +70,11 @@ def agreement_of(left: pd.Series, right: pd.Series) -> dict[str, float]:
         return row
 
     equal = float((left[both] == right[both]).mean())
-    return row | {"median difference": float("nan")} | {
-        f"within {x} s.f.": equal for x in SIGNIFICANT_FIGURES
-    }
+    return (
+        row
+        | {"median difference": float("nan")}
+        | {f"within {x} s.f.": equal for x in SIGNIFICANT_FIGURES}
+    )
 
 
 def compare_values(night: str, data_dir: Path | None = None) -> pd.DataFrame:

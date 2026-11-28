@@ -534,8 +534,8 @@ def value_section(night: str, data_dir: Path | None = None) -> Section:
         index=df.index,
     )
 
-    classes = pd.DataFrame("", index=table.index, columns=table.columns)
-    classes[AGREEMENT_COLUMN] = [band_of(x) for x in df[AGREEMENT_COLUMN]]
+    bands = [band_of(x) for x in df[AGREEMENT_COLUMN]]
+    classes = pd.DataFrame({x: bands for x in table.columns}, index=table.index)
 
     text = (
         "The value of each column of a matched pair, compared over every pair "
