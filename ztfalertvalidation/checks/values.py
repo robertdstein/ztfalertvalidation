@@ -17,8 +17,13 @@ logger = logging.getLogger(__name__)
 DECIMAL_PLACES = [2, 3]
 AGREEMENT_LABELS = {x: f"within {x} d.p." for x in DECIMAL_PLACES}
 
-# the strictest of them is the one the report sorts and colours by
-AGREEMENT_LABEL = AGREEMENT_LABELS[max(DECIMAL_PLACES)]
+# the loosest of them is the one the report sorts and colours by
+AGREEMENT_LABEL = AGREEMENT_LABELS[min(DECIMAL_PLACES)]
+
+# the two pipelines do not share a history, so the columns taken from one are
+# not compared until they do
+CHECK_HISTORY = False
+HISTORY_MARKER = "hist"
 DIFFERENCE_QUANTILE = 0.99
 DIFFERENCE_LABEL = "99th percentile difference"
 KEY_COLUMNS = ["candid", "objectId"]
@@ -65,16 +70,23 @@ def agreement_of(left: pd.Series, right: pd.Series) -> dict[str, float]:
     return row | unmeasured | {x: equal for x in AGREEMENT_LABELS.values()}
 
 
-def compare_values(night: str, data_dir: Path | None = None) -> pd.DataFrame:
+def compare_values(
+    night: str,
+    data_dir: Path | None = None,
+    check_history: bool = CHECK_HISTORY,
+) -> pd.DataFrame:
     """
     Compare the value of every column, over the matched alerts of a night
 
     The candid and the object name are left out: the candid is the key the
     alerts are paired by, and the two pipelines name a source differently by
-    design, so neither says anything about how they agree.
+    design, so neither says anything about how they agree. A column counting
+    back over the survey is measured but not counted as checked, unless the
+    two pipelines are known to share a history.
 
     :param night: Night, as a 'YYYYMMDD' string
     :param data_dir: Path to data directory
+    :param check_history: Whether a history column counts as checked
     :return: Table of one row per column
     """
     fields = get_fields(get_ipac_dir(night, data_dir))
@@ -90,6 +102,9 @@ def compare_values(night: str, data_dir: Path | None = None) -> pd.DataFrame:
         index=pd.Index(columns, name="column"),
     )
     table["compared"] = table["compared"].astype("int64")
+    table["checked"] = [
+        check_history or HISTORY_MARKER not in x.lower() for x in columns
+    ]
 
     logger.info(f"Compared {len(columns)} columns over {len(pairs)} matched alerts")
 

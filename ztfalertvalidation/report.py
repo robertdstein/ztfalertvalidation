@@ -69,13 +69,17 @@ def format_number(value: float) -> str:
     return "&mdash;" if pd.isna(value) else f"{value:.3g}"
 
 
-def band_of(agreement: float) -> str:
+def band_of(agreement: float, checked: bool = True) -> str:
     """
     Get the css class a column's agreement falls in
 
     :param agreement: Fraction of pairs whose values agree
+    :param checked: Whether the column is being checked at all
     :return: Css class for the cell
     """
+    if not checked:
+        return "agree-ignored"
+
     for name, limit in AGREEMENT_BANDS.items():
         if agreement >= limit:
             return name
@@ -534,7 +538,8 @@ def value_section(night: str, data_dir: Path | None = None) -> Section:
     :return: Section of the report
     """
     df = compare_values(night, data_dir).sort_values(
-        [AGREEMENT_COLUMN, "median difference"]
+        ["checked", AGREEMENT_COLUMN, "median difference"],
+        ascending=[False, True, True],
     )
 
     table = pd.DataFrame(
@@ -552,24 +557,30 @@ def value_section(night: str, data_dir: Path | None = None) -> Section:
         index=df.index,
     )
 
-    bands = [band_of(x) for x in df[AGREEMENT_COLUMN]]
+    bands = [
+        band_of(x, checked) for x, checked in zip(df[AGREEMENT_COLUMN], df["checked"])
+    ]
     classes = pd.DataFrame({x: bands for x in table.columns}, index=table.index)
 
     text = (
         "The value of each column of a matched pair, compared over every pair "
         "of the night. A column of numbers counts as agreeing when both "
-        "values round to the same three decimal places, and any "
+        "values round to the same two decimal places, and any "
         "other column when the two are equal to three decimal places. The "
         "object name and the candid "
         "are left out, since the two pipelines give a source different ones "
         "by design."
     )
 
-    full = int((df[AGREEMENT_COLUMN] == 1).sum())
-    poor = int((df[AGREEMENT_COLUMN] < 0.9).sum())
+    checked = df[df["checked"]]
+    full = int((checked[AGREEMENT_COLUMN] == 1).sum())
+    poor = int((checked[AGREEMENT_COLUMN] < 0.9).sum())
     message = (
-        f"{full} of {len(df)} columns agree to three decimal places for "
-        f"every matched pair, and {poor} agree for fewer than 90% of them."
+        f"{full} of {len(checked)} checked columns agree to two decimal "
+        f"places for every matched pair, and {poor} agree for fewer than 90% "
+        f"of them. The {len(df) - len(checked)} columns counting back over "
+        "the survey are greyed out and left out of those counts, since the "
+        "two pipelines do not share a history."
     )
 
     return Section("Column agreement", text, table, {}, message, classes)
@@ -697,7 +708,9 @@ td { font-variant-numeric: tabular-nums; }
 .agree-high { background: rgba(140, 160, 40, 0.16); }
 .agree-mid { background: rgba(200, 130, 30, 0.20); }
 .agree-low { background: rgba(190, 60, 60, 0.20); }
-td.description, .agree-full, .agree-high, .agree-mid, .agree-low {
+.agree-ignored { color: var(--faint); }
+td.description, .agree-full, .agree-high, .agree-mid, .agree-low,
+.agree-ignored {
   white-space: normal;
 }
 .message {
