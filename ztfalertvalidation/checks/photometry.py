@@ -13,7 +13,6 @@ from ztfalertvalidation.tables import get_dza_table, get_ipac_table
 
 logger = logging.getLogger(__name__)
 
-MAG_COLUMNS = ["magpsf", "magap"]
 PRIMARY_MAG_COLUMN = "magpsf"
 DEPTH_COLUMN = "diffmaglim"
 QUANTILES = [0.5, 0.9, 0.99]
@@ -75,11 +74,11 @@ def compare_depth(night: str, data_dir: Path | None = None) -> pd.DataFrame:
     return table
 
 
-def compare_photometry(
+def get_differences(
     night: str, column: str, data_dir: Path | None = None
 ) -> pd.DataFrame:
     """
-    Compare one magnitude the two pipelines measure for a matched source
+    Get the difference in one magnitude for each matched pair of a night
 
     The difference is given both as a fraction of the flux, since that is how
     the requirement is set, and as a magnitude.
@@ -87,21 +86,36 @@ def compare_photometry(
     :param night: Night, as a 'YYYYMMDD' string
     :param column: Magnitude to compare, such as 'magpsf'
     :param data_dir: Path to data directory
-    :return: Table of one row per quantile of the difference
+    :return: Table of one row per matched pair
     """
     pairs = get_matched_pairs(night, [column], data_dir)
     delta = pairs[f"{column}_dza"] - pairs[f"{column}_ipac"]
 
-    table = pd.DataFrame(
+    return pd.DataFrame(
         {
-            "flux difference": flux_ratio(delta).abs().quantile(QUANTILES).to_numpy(),
-            "magnitude difference": delta.abs().quantile(QUANTILES).to_numpy(),
-        },
-        index=[f"{x:.0%}" for x in QUANTILES],
+            "flux difference": flux_ratio(delta).abs(),
+            "magnitude difference": delta.abs(),
+        }
     )
+
+
+def compare_photometry(
+    night: str, column: str, data_dir: Path | None = None
+) -> pd.DataFrame:
+    """
+    Compare one magnitude the two pipelines measure for a matched source
+
+    :param night: Night, as a 'YYYYMMDD' string
+    :param column: Magnitude to compare, such as 'magpsf'
+    :param data_dir: Path to data directory
+    :return: Table of one row per quantile of the difference
+    """
+    differences = get_differences(night, column, data_dir)
+
+    table = differences.quantile(QUANTILES).set_axis([f"{x:.0%}" for x in QUANTILES])
     table.index.name = "quantile"
 
-    logger.info(f"Compared the {column} of {len(pairs)} matched alerts")
+    logger.info(f"Compared the {column} of {len(differences)} matched alerts")
 
     return table
 
@@ -118,9 +132,7 @@ def fraction_within(
     :param data_dir: Path to data directory
     :return: The number agreeing, and the number of matched alerts
     """
-    pairs = get_matched_pairs(night, [column], data_dir)
+    differences = get_differences(night, column, data_dir)
+    agreeing = int((differences["flux difference"] < limit).sum())
 
-    delta = pairs[f"{column}_dza"] - pairs[f"{column}_ipac"]
-    agreeing = int((flux_ratio(delta).abs() < limit).sum())
-
-    return agreeing, len(pairs)
+    return agreeing, len(differences)
