@@ -59,6 +59,16 @@ class Section:
     classes: pd.DataFrame | None = None
 
 
+def format_number(value: float) -> str:
+    """
+    Render a number for the report, or a dash where there is none
+
+    :param value: Number to render
+    :return: The number, to three figures
+    """
+    return "&mdash;" if pd.isna(value) else f"{value:.3g}"
+
+
 def band_of(agreement: float) -> str:
     """
     Get the css class a column's agreement falls in
@@ -523,14 +533,16 @@ def value_section(night: str, data_dir: Path | None = None) -> Section:
     :param data_dir: Path to data directory
     :return: Section of the report
     """
-    df = compare_values(night, data_dir).sort_values(AGREEMENT_COLUMN)
+    df = compare_values(night, data_dir).sort_values(
+        [AGREEMENT_COLUMN, "median difference"]
+    )
 
     table = pd.DataFrame(
         {
             AGREEMENT_LABEL: [f"{x:.1%}" for x in df[AGREEMENT_COLUMN]],
-            "median difference": [f"{x:.3g}" for x in df["median difference"]],
+            "median difference": [format_number(x) for x in df["median difference"]],
             "99th pct difference": [
-                f"{x:.3g}" for x in df["99th percentile difference"]
+                format_number(x) for x in df["99th percentile difference"]
             ],
             "description": df["description"],
         },
