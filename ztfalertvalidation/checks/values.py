@@ -20,13 +20,35 @@ AGREEMENT_LABELS = {x: f"within {x} d.p." for x in DECIMAL_PLACES}
 # the loosest of them is the one the report sorts and colours by
 AGREEMENT_LABEL = AGREEMENT_LABELS[min(DECIMAL_PLACES)]
 
-# the two pipelines do not share a history, so the columns taken from one are
-# not compared until they do
+# the two pipelines do not share a history, so the columns counting back over
+# one are not checked until they do. jdendhist is not among them: it is the
+# epoch of the latest detection, which both pipelines see
 CHECK_HISTORY = False
-HISTORY_MARKER = "hist"
+HISTORY_GROUP = "history"
+HISTORY_COLUMNS = ["ncovhist", "ndethist", "jdstarthist"]
+
+# named for the nearest solar system object, unlike ssnrms, which is a ratio
+SOLAR_SYSTEM_GROUP = "solar system"
+SOLAR_SYSTEM_COLUMNS = ["ssdistnr", "ssmagnr", "ssnamenr"]
 DIFFERENCE_QUANTILE = 0.99
 DIFFERENCE_LABEL = "99th percentile difference"
 KEY_COLUMNS = ["candid", "objectId"]
+
+
+def group_of(column: str) -> str:
+    """
+    Get the group a column is reported in
+
+    :param column: Name of the column
+    :return: Name of its group, or an empty string for the main table
+    """
+    if column in HISTORY_COLUMNS:
+        return HISTORY_GROUP
+
+    if column in SOLAR_SYSTEM_COLUMNS:
+        return SOLAR_SYSTEM_GROUP
+
+    return ""
 
 
 def agreement_of(left: pd.Series, right: pd.Series) -> dict[str, float]:
@@ -102,9 +124,8 @@ def compare_values(
         index=pd.Index(columns, name="column"),
     )
     table["compared"] = table["compared"].astype("int64")
-    table["checked"] = [
-        check_history or HISTORY_MARKER not in x.lower() for x in columns
-    ]
+    table["group"] = [group_of(x) for x in columns]
+    table["checked"] = check_history | (table["group"] != HISTORY_GROUP)
 
     logger.info(f"Compared {len(columns)} columns over {len(pairs)} matched alerts")
 

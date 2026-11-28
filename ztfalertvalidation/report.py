@@ -23,7 +23,12 @@ from ztfalertvalidation.checks import (
 )
 from ztfalertvalidation.checks.photometry import PRIMARY_MAG_COLUMN
 from ztfalertvalidation.checks.quadrants import N_QUADRANTS
-from ztfalertvalidation.checks.values import AGREEMENT_LABEL, AGREEMENT_LABELS
+from ztfalertvalidation.checks.values import (
+    AGREEMENT_LABEL,
+    AGREEMENT_LABELS,
+    HISTORY_GROUP,
+    SOLAR_SYSTEM_GROUP,
+)
 from ztfalertvalidation.crossmatch import (
     MAX_SEPARATION_ARCSEC,
     get_matched_dza_table,
@@ -39,6 +44,31 @@ MVP_SEPARATION_ARCSEC = 0.5
 MVP_FLUX_FRACTION = 0.05
 AGREEMENT_BANDS = {"agree-full": 1.0, "agree-high": 0.99, "agree-mid": 0.9}
 AGREEMENT_COLUMN = AGREEMENT_LABEL
+VALUE_TITLES = {
+    "": "Column agreement",
+    SOLAR_SYSTEM_GROUP: "Solar system columns",
+    HISTORY_GROUP: "History columns",
+}
+VALUE_TEXTS = {
+    "": (
+        "The value of each column of a matched pair, compared over every pair "
+        "of the night. A column of numbers counts as agreeing when both "
+        "values round to the same two decimal places, and any other column "
+        "when the two are equal. The object name and the candid are left out, "
+        "since the two pipelines give a source different ones by design. The "
+        "history and solar system columns have tables of their own below."
+    ),
+    SOLAR_SYSTEM_GROUP: (
+        "The columns describing the nearest known solar system object within "
+        "30 arcsec, taken from the MPC archive, over the same matched pairs."
+    ),
+    HISTORY_GROUP: (
+        "The columns counting back over the survey. The two pipelines do not "
+        "share a history, so these are measured but not checked, and are "
+        "greyed out. jdendhist is not among them: it is the epoch of the "
+        "latest detection, which both pipelines see."
+    ),
+}
 PHOTOMETRY_TITLES = {
     "magpsf": "PSF photometry",
     "magap": "Aperture photometry",
@@ -529,15 +559,17 @@ def column_section(night: str, data_dir: Path | None = None) -> Section:
     return Section("Alert columns", text, table, {}, message)
 
 
-def value_section(night: str, data_dir: Path | None = None) -> Section:
+def value_section(night: str, group: str = "", data_dir: Path | None = None) -> Section:
     """
     Report how closely each column of a matched alert agrees
 
     :param night: Night, as a 'YYYYMMDD' string
+    :param group: Group of columns to report, or all the rest by default
     :param data_dir: Path to data directory
     :return: Section of the report
     """
-    df = compare_values(night, data_dir).sort_values(
+    values = compare_values(night, data_dir)
+    df = values[values["group"] == group].sort_values(
         ["checked", AGREEMENT_COLUMN, "median difference"],
         ascending=[False, True, True],
     )
@@ -562,28 +594,14 @@ def value_section(night: str, data_dir: Path | None = None) -> Section:
     ]
     classes = pd.DataFrame({x: bands for x in table.columns}, index=table.index)
 
-    text = (
-        "The value of each column of a matched pair, compared over every pair "
-        "of the night. A column of numbers counts as agreeing when both "
-        "values round to the same two decimal places, and any "
-        "other column when the two are equal to three decimal places. The "
-        "object name and the candid "
-        "are left out, since the two pipelines give a source different ones "
-        "by design."
-    )
-
-    checked = df[df["checked"]]
-    full = int((checked[AGREEMENT_COLUMN] == 1).sum())
-    poor = int((checked[AGREEMENT_COLUMN] < 0.9).sum())
+    full = int((df[AGREEMENT_COLUMN] == 1).sum())
+    poor = int((df[AGREEMENT_COLUMN] < 0.9).sum())
     message = (
-        f"{full} of {len(checked)} checked columns agree to two decimal "
-        f"places for every matched pair, and {poor} agree for fewer than 90% "
-        f"of them. The {len(df) - len(checked)} columns counting back over "
-        "the survey are greyed out and left out of those counts, since the "
-        "two pipelines do not share a history."
+        f"{full} of {len(df)} columns agree to two decimal places for every "
+        f"matched pair, and {poor} agree for fewer than 90% of them."
     )
 
-    return Section("Column agreement", text, table, {}, message, classes)
+    return Section(VALUE_TITLES[group], VALUE_TEXTS[group], table, {}, message, classes)
 
 
 def build_sections(night: str, data_dir: Path | None = None) -> list[Section]:
@@ -604,7 +622,9 @@ def build_sections(night: str, data_dir: Path | None = None) -> list[Section]:
         depth_section(night, data_dir),
         photometry_section(night, PRIMARY_MAG_COLUMN, data_dir),
         photometry_section(night, "magap", data_dir),
-        value_section(night, data_dir),
+        value_section(night, data_dir=data_dir),
+        value_section(night, SOLAR_SYSTEM_GROUP, data_dir),
+        value_section(night, HISTORY_GROUP, data_dir),
     ]
 
 
