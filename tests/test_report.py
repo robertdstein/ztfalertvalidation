@@ -138,6 +138,7 @@ class TestReport(unittest.TestCase):
 
             self.assertIn("Astrometric precision", page)
             self.assertIn("Alert columns", page)
+            self.assertIn("Source naming", page)
             self.assertIn("Column agreement", page)
             self.assertIn("Solar system columns", page)
             self.assertIn("History columns", page)
@@ -148,7 +149,7 @@ class TestReport(unittest.TestCase):
             self.assertIn("programid 1", page)
 
             # each section ends in its take-home message
-            self.assertEqual(page.count('class="message"'), 12)
+            self.assertEqual(page.count('class="message"'), 13)
 
     def test_summary_collects_the_sections(self):
         """Test that the summary holds the night and each section's numbers"""

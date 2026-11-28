@@ -8,6 +8,7 @@ from ztfalertvalidation.checks import (
     compare_depth,
     compare_photometry,
     compare_quadrants,
+    compare_sources,
     compare_volume,
     fraction_within,
     get_quadrant_depth,
@@ -31,6 +32,10 @@ from ztfalertvalidation.paths import (
     get_ipac_dir,
     get_night_dir,
     list_nights,
+)
+from ztfalertvalidation.plots import (
+    find_matched_pair,
+    plot_alert_pair,
 )
 from ztfalertvalidation.report import (
     Section,

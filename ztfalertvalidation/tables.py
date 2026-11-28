@@ -3,6 +3,7 @@ Scripts for caching the alerts of a night as a table
 """
 
 import logging
+import re
 from pathlib import Path
 
 import pandas as pd
@@ -36,6 +37,16 @@ def load_cached_table(alert_dir: Path, table_path: Path) -> pd.DataFrame:
     return df
 
 
+def rename_dza(name: str) -> str:
+    """
+    Rename the ZTF object name of a DZA alert to a DZA one
+
+    :param name: Name the alert carries
+    :return: Name with the DZA prefix
+    """
+    return re.sub("^ZTF", "DZA", name)
+
+
 def get_dza_table(night: str, data_dir: Path | None = None) -> pd.DataFrame:
     """
     Load the table of DZA alerts of a night
@@ -51,7 +62,7 @@ def get_dza_table(night: str, data_dir: Path | None = None) -> pd.DataFrame:
         get_dza_dir(night, data_dir),
         get_night_dir(night, data_dir) / "dza.parquet",
     )
-    df["objectId"] = df["objectId"].str.replace("^ZTF", "DZA", regex=True)
+    df["objectId"] = df["objectId"].map(rename_dza)
     return df
 
 

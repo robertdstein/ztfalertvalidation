@@ -13,5 +13,6 @@ from ztfalertvalidation.checks.quadrants import (
     compare_quadrants,
     list_asymmetric_failures,
 )
+from ztfalertvalidation.checks.sources import compare_sources
 from ztfalertvalidation.checks.values import compare_values
 from ztfalertvalidation.checks.volume import compare_volume
