@@ -8,6 +8,7 @@ from ztfalertvalidation.checks import (
     compare_depth,
     compare_photometry,
     compare_quadrants,
+    compare_sources,
     compare_volume,
     fraction_within,
     get_quadrant_depth,

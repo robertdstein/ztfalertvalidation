@@ -15,6 +15,7 @@ from ztfalertvalidation.checks import (
     compare_depth,
     compare_photometry,
     compare_quadrants,
+    compare_sources,
     compare_values,
     compare_volume,
     fraction_within,
@@ -445,6 +446,43 @@ def astrometry_section(night: str, data_dir: Path | None = None) -> Section:
     return Section("Astrometric precision", text, table, {}, message)
 
 
+def source_section(night: str, data_dir: Path | None = None) -> Section:
+    """
+    Report how the two pipelines name the sources of a night
+
+    :param night: Night, as a 'YYYYMMDD' string
+    :param data_dir: Path to data directory
+    :return: Section of the report
+    """
+    df = compare_sources(night, data_dir)
+
+    text = (
+        "The names each pipeline gives its sources. One source lies at one "
+        "position of one readout, so a name should appear once in an exposure "
+        "quadrant, and a matched source should carry one name in each "
+        "pipeline."
+    )
+
+    repeated = df.loc["sources named twice in one quadrant"]
+    split = df.loc["of those, matched to more than one name"]
+    matched = df.loc["sources matched to the other pipeline"]
+    message = (
+        f"IPAC names {repeated['IPAC']:,} sources more than once in a single "
+        f"exposure quadrant and DZA {repeated['DZA']:,}, which should not "
+        f"happen at all. A further {split['IPAC']:,} IPAC sources "
+        f"({split['IPAC'] / matched['IPAC']:.1%}) are matched to more than "
+        f"one DZA name, and {split['DZA']:,} DZA sources the other way."
+    )
+
+    summary = {
+        "Sources named twice in one quadrant": (
+            f"{repeated['IPAC']:,} IPAC / {repeated['DZA']:,} DZA"
+        ),
+    }
+
+    return Section("Source naming", text, df, summary, message)
+
+
 def depth_section(night: str, data_dir: Path | None = None) -> Section:
     """
     Report how deep each pipeline reaches in each quadrant
@@ -623,6 +661,7 @@ def build_sections(night: str, data_dir: Path | None = None) -> list[Section]:
         quadrant_section(night, data_dir),
         failure_section(night, data_dir),
         crossmatch_section(night, data_dir),
+        source_section(night, data_dir),
         astrometry_section(night, data_dir),
         depth_section(night, data_dir),
         photometry_section(night, PRIMARY_MAG_COLUMN, data_dir),
